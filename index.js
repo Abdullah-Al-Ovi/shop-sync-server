@@ -29,6 +29,9 @@ async function run() {
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
     userCollection = client.db('shopSync').collection('users')
     const shopCollection = client.db('shopSync').collection('shops')
+    const productCollection = client.db('shopSync').collection('products')
+    const cartCollection = client.db('shopSync').collection('carts')
+    const saleCollection = client.db('shopSync').collection('sales')
 
     app.post('/users',async(req,res)=>{
         const userInfo = req.body 
@@ -67,7 +70,11 @@ async function run() {
       const result = await userCollection.updateOne(filter,updatedDoc)
       res.send(result)
     })
-
+    app.get('/users/:email',async(req,res)=>{
+      const email = req.params?.email 
+      const result = await userCollection.findOne({email: email})
+      res.send(result)
+    })
     app.get('/users/manager/:email',async(req,res)=>{
         const email = req.params?.email 
         // if(email !== req.decoded?.email){
@@ -92,6 +99,171 @@ async function run() {
         }
         res.send(isAdmin)
       })
+
+      app.get('/products/:email',async(req,res)=>{
+        const email = req.params.email
+        const result = await productCollection.find({manager: email}).toArray()
+        res.send(result)
+      })
+
+      app.get('/products/update/:id',async(req,res)=>{
+        const id = req.params.id
+        const result = await productCollection.findOne({_id: new ObjectId(id)})
+        res.send(result)
+      })
+
+      app.get(`/carts/:email`,async(req,res)=>{
+        const email = req.params.email
+        const result = await cartCollection.find({manager: email}).toArray()
+        res.send(result)
+      })
+
+      app.get('/sales/:email',async(req,res)=>{
+        const email = req.params.email
+        const result = await saleCollection
+        .find({ manager: email })
+        .sort({ sellingDate: -1 }) 
+        .toArray();
+        res.send(result)
+      })
+
+      app.patch('/products/update/:id',async(req,res)=>{
+        const id = req.params.id
+        const body = req.body
+        console.log(id);
+        console.log(body);
+        const updatedDoc = {
+          $set:{
+                productName : body?.productName,
+                productImage:body?.productImage ,
+                productQuantity :body?.productQuantity ,
+                productLocation :body?.productLocation,
+                productionCost : body?.productionCost,
+                profitMargin: body?.profitMargin,
+                discount :body?.discount ,
+                description:body?.description,
+                sellingPrice : body?.sellingPrice 
+          }
+        }
+        
+        const result = await productCollection.updateOne({_id: new ObjectId(id)},updatedDoc)
+        res.send(result)
+      })
+
+      app.post('/addProduct',async(req,res)=>{
+        const productInfo = req.body 
+        console.log(productInfo);
+        const shop = await shopCollection.findOne({_id: new ObjectId(productInfo?.shopId)})
+        // console.log(shop?.productsCount,shop?.limit,shop);
+        if(shop?.limit>0){
+          const result = await productCollection.insertOne(productInfo) 
+          // console.log('hobe');
+          res.send(result)
+        }
+        else{
+          // console.log('hobena');
+         return res.send({message:'You have crossed your product adding limit',insertedId: null})
+         
+        }
+      })
+
+      app.post('/sales',async(req,res)=>{
+        const salesInfo = req.body
+        const query = {
+          _id : {
+            $in: salesInfo?.cartIds?.map(id=>new ObjectId(id))
+          }
+        }
+        const insertResult = await saleCollection.insertOne(salesInfo)
+        const deleteResult = await cartCollection.deleteMany(query)
+
+        res.send({insertResult,deleteResult})
+      })
+
+
+      app.post('/carts',async(req,res)=>{
+        const cartInfo = req.body 
+        const result = await cartCollection.insertOne(cartInfo)
+        res.send(result)
+      })
+
+      app.patch('/changeLimit/:shopId',async(req,res)=>{
+        const shopId = req.params.shopId
+        const shop = await shopCollection.findOne({_id: new ObjectId(shopId)})
+        const newLimit = shop?.limit - 1;
+        
+        const updatedDoc = {
+          $set:{
+            limit : newLimit
+          }
+        }
+        const result = await shopCollection.updateOne({_id: new ObjectId(shopId)},updatedDoc)
+        res.send(result)
+      })
+
+      app.patch('/updateSaleCount/:id',async(req,res)=>{
+        const id = req.params.id
+        console.log(id);
+        const product = await productCollection.findOne({_id: new ObjectId(id)})
+        const newSaleCount = product?.saleCount + 1;
+        const newQuantity = product?.productQuantity - 1;
+        
+        const updatedDoc = {
+          $set:{
+            saleCount : newSaleCount,
+            productQuantity: newQuantity
+          }
+        }
+        const result = await productCollection.updateOne({_id: new ObjectId(id)},updatedDoc)
+        res.send(result)
+      })
+
+      app.patch('/increaseLimit/:shopId',async(req,res)=>{
+        const shopId = req.params.shopId
+        const shop = await shopCollection.findOne({_id: new ObjectId(shopId)})
+        const newLimit = shop?.limit + 1;
+        
+        const updatedDoc = {
+          $set:{
+            limit : newLimit
+          }
+        }
+        const result = await shopCollection.updateOne({_id: new ObjectId(shopId)},updatedDoc)
+        res.send(result)
+      })
+
+      app.patch(`/productCountIncrease/:shopId`,async(req,res)=>{
+        const shopId = req.params.shopId
+        const shop = await shopCollection.findOne({_id: new ObjectId(shopId)})
+        const newProductsCount = shop?.productsCount + 1;
+        const updatedDoc = {
+          $set:{
+            productsCount: newProductsCount
+          }
+        }
+        const result = await shopCollection.updateOne({_id: new ObjectId(shopId)},updatedDoc)
+        res.send(result)
+      })
+
+      app.patch(`/productCountDecrease/:shopId`,async(req,res)=>{
+        const shopId = req.params.shopId
+        const shop = await shopCollection.findOne({_id: new ObjectId(shopId)})
+        const newProductsCount = shop?.productsCount - 1;
+        const updatedDoc = {
+          $set:{
+            productsCount: newProductsCount
+          }
+        }
+        const result = await shopCollection.updateOne({_id: new ObjectId(shopId)},updatedDoc)
+        res.send(result)
+      })
+
+      app.delete('/products/:id',async(req,res)=>{
+        const id = req.params.id
+        const result = await productCollection.deleteOne({_id : new ObjectId(id)})
+        res.send(result)
+      })
+
     // JWT......
     app.post('/jwt',(req,res)=>{
         const user = req.body 
