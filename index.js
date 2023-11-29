@@ -11,6 +11,42 @@ app.use(cors({
 app.use(express.json())
 let userCollection;
 
+// Authorization and authentication:
+const verifyingToken =(req,res,next)=>{
+  if(!req.headers?.authorization){
+    return res.status(401).send({message:'User unauthorized'})
+  }
+  const token = req.headers.authorization.split(' ')[1]
+  console.log(token);
+  jwt.verify(token,process.env.ACCESS_TOKEN,(err,decoded)=>{
+    if(err){
+      return res.status(401).send({message:'User unauthorized'})
+    }
+    req.decoded = decoded
+    next()
+  })  
+}
+
+const verifyingAdmin =async(req,res,next)=>{
+  const email = req.decoded?.email
+  const exist = await userCollection.findOne({email : email})
+  const isAdmin = exist.role === 'admin'
+  if(!isAdmin){
+    return res.status(403).send({message:'Forbidden access'})
+  }
+  next()
+}
+
+const verifyingManager =async(req,res,next)=>{
+  const email = req.decoded?.email
+  const exist = await userCollection.findOne({email : email})
+  const isAdmin = exist.role === 'manager'
+  if(!isAdmin){
+    return res.status(403).send({message:'Forbidden access'})
+  }
+  next()
+}
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wukhoja.mongodb.net/?retryWrites=true&w=majority`;
 
 
@@ -43,7 +79,7 @@ async function run() {
         res.send(result)
       })
 
-    app.post('/createShop',async(req,res)=>{
+    app.post('/createShop',verifyingToken,verifyingManager,async(req,res)=>{
         const shopInfo = req.body
         shopInfo.limit = 3;
         console.log(shopInfo);
@@ -55,7 +91,7 @@ async function run() {
         res.send(result)
     })  
 
-    app.patch('/users/:email',async(req,res)=>{
+    app.patch('/users/:email',verifyingToken,async(req,res)=>{
         const updatedUserInfo = req.body
         const email = req.params?.email
       const filter = {email:email}
@@ -70,7 +106,7 @@ async function run() {
       const result = await userCollection.updateOne(filter,updatedDoc)
       res.send(result)
     })
-    app.get('/users/:email',async(req,res)=>{
+    app.get('/users/:email',verifyingToken,async(req,res)=>{
       const email = req.params?.email 
       const result = await userCollection.findOne({email: email})
       res.send(result)
@@ -100,25 +136,25 @@ async function run() {
         res.send(isAdmin)
       })
 
-      app.get('/products/:email',async(req,res)=>{
+      app.get('/products/:email',verifyingToken,verifyingManager,async(req,res)=>{
         const email = req.params.email
         const result = await productCollection.find({manager: email}).toArray()
         res.send(result)
       })
 
-      app.get('/products/update/:id',async(req,res)=>{
+      app.get('/products/update/:id',verifyingToken,verifyingManager,async(req,res)=>{
         const id = req.params.id
         const result = await productCollection.findOne({_id: new ObjectId(id)})
         res.send(result)
       })
 
-      app.get(`/carts/:email`,async(req,res)=>{
+      app.get(`/carts/:email`,verifyingToken,verifyingManager,async(req,res)=>{
         const email = req.params.email
         const result = await cartCollection.find({manager: email}).toArray()
         res.send(result)
       })
 
-      app.get('/sales/:email',async(req,res)=>{
+      app.get('/sales/:email',verifyingToken,verifyingManager,async(req,res)=>{
         const email = req.params.email
         const result = await saleCollection
         .find({ manager: email })
@@ -127,7 +163,7 @@ async function run() {
         res.send(result)
       })
 
-      app.patch('/products/update/:id',async(req,res)=>{
+      app.patch('/products/update/:id',verifyingToken,verifyingManager,async(req,res)=>{
         const id = req.params.id
         const body = req.body
         console.log(id);
@@ -150,7 +186,7 @@ async function run() {
         res.send(result)
       })
 
-      app.post('/addProduct',async(req,res)=>{
+      app.post('/addProduct',verifyingToken,verifyingManager,async(req,res)=>{
         const productInfo = req.body 
         console.log(productInfo);
         const shop = await shopCollection.findOne({_id: new ObjectId(productInfo?.shopId)})
@@ -167,7 +203,7 @@ async function run() {
         }
       })
 
-      app.post('/sales',async(req,res)=>{
+      app.post('/sales',verifyingToken,verifyingManager,async(req,res)=>{
         const salesInfo = req.body
         const query = {
           _id : {
@@ -181,7 +217,7 @@ async function run() {
       })
 
 
-      app.post('/carts',async(req,res)=>{
+      app.post('/carts',verifyingToken,verifyingManager,async(req,res)=>{
         const cartInfo = req.body 
         const result = await cartCollection.insertOne(cartInfo)
         res.send(result)
@@ -258,7 +294,7 @@ async function run() {
         res.send(result)
       })
 
-      app.delete('/products/:id',async(req,res)=>{
+      app.delete('/products/:id',verifyingToken,verifyingManager,async(req,res)=>{
         const id = req.params.id
         const result = await productCollection.deleteOne({_id : new ObjectId(id)})
         res.send(result)
