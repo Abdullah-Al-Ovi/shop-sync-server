@@ -85,23 +85,23 @@ async function run() {
     // Nodemailer config starts
 
 
-    app.post('/send-email',verifyingToken,verifyingAdmin, (req, res) => {
+    app.post('/send-email', verifyingToken, verifyingAdmin, (req, res) => {
       const { to, subject, text } = req.body;
-      console.log(to,subject,text);
+      console.log(to, subject, text);
       const transporter = nodemailer.createTransport({
         host: 'smtp.gmail.com',
-        port:587,
-        secure:false,
+        port: 587,
+        secure: false,
         auth: {
           user: process.env.NODEMAILER_USER,
           pass: process.env.NODEMAILER_PASS,
         },
       });
       const mailOptions = {
-        from:process.env.NODEMAILER_USER ,
+        from: process.env.NODEMAILER_USER,
         to: to,
-        subject:subject,
-        text:text,
+        subject: subject,
+        text: text,
       };
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
@@ -160,10 +160,24 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/allShop',verifyingToken,verifyingAdmin, async (req, res) => {
+    app.get('/allShop', verifyingToken, verifyingAdmin, async (req, res) => {
       const result = await shopCollection.find({}).toArray()
       res.send(result)
     })
+
+    app.get('/allProducts',verifyingToken,verifyingAdmin,async(req,res)=>{
+      const result = await productCollection.find({}).toArray()
+      res.send(result)
+    })
+    app.get('/users',verifyingToken,verifyingAdmin,async(req,res)=>{
+      const result = await userCollection.find({}).toArray();
+      res.send(result)
+    })
+    app.get('/allSales',verifyingToken,verifyingAdmin,async(req,res)=>{
+      const result = await saleCollection.find({}).toArray()
+      res.send(result)
+    })
+
     app.get('/users/manager/:email', async (req, res) => {
       const email = req.params?.email
       // if(email !== req.decoded?.email){
