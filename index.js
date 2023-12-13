@@ -46,7 +46,7 @@ const verifyingAdmin = async (req, res, next) => {
   const exist = await userCollection.findOne({ email: email })
   const isAdmin = exist.role === 'admin'
   if (!isAdmin) {
-    return res.status(403).send({ message: 'Forbidden access' })
+    return res.status(403).send({ message: 'Forbidden access'})
   }
   next()
 }
@@ -77,13 +77,14 @@ async function run() {
     // await client.connect();
     // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
+
     userCollection = client.db('shopSync').collection('users')
     const shopCollection = client.db('shopSync').collection('shops')
     const productCollection = client.db('shopSync').collection('products')
     const cartCollection = client.db('shopSync').collection('carts')
     const saleCollection = client.db('shopSync').collection('sales')
-    // Nodemailer config starts
 
+    // Nodemailer config starts
 
     app.post('/send-email', verifyingToken, verifyingAdmin, (req, res) => {
       const { to, subject, text } = req.body;
@@ -114,8 +115,6 @@ async function run() {
 
     // Nodemailer config ends
 
-
-
     app.post('/users', async (req, res) => {
       const userInfo = req.body
       const existUser = await userCollection.findOne({ email: userInfo.email })
@@ -139,7 +138,7 @@ async function run() {
       res.send(result)
     })
 
-    app.patch('/users/:email', verifyingToken, async (req, res) => {
+    app.patch('/users/:email', async (req, res) => {
       const updatedUserInfo = req.body
       const email = req.params?.email
       const filter = { email: email }
@@ -154,9 +153,29 @@ async function run() {
       const result = await userCollection.updateOne(filter, updatedDoc)
       res.send(result)
     })
-    app.get('/users/:email', verifyingToken, async (req, res) => {
+
+  app.patch('/banShop/:email',async(req,res)=>{
+    const updatedRole = req.body
+    const email = req.params?.email
+    const filter = { email: email }
+    const updatedDoc ={
+      $set:{
+        restriction : updatedRole?.restriction
+      }
+    }
+    const result = await userCollection.updateOne(filter, updatedDoc)
+    res.send(result)
+
+  })
+    app.get('/users/:email', async (req, res) => {
       const email = req.params?.email
       const result = await userCollection.findOne({ email: email })
+      res.send(result)
+    })
+
+    app.get('/singleShop/:email',async(req,res)=>{
+      const email = req.params?.email
+      const result = await shopCollection.findOne({ownerEmail: email})
       res.send(result)
     })
 
@@ -180,9 +199,6 @@ async function run() {
 
     app.get('/users/manager/:email', async (req, res) => {
       const email = req.params?.email
-      // if(email !== req.decoded?.email){
-      //   return res.status(403).send({message:'Forbidden access'})
-      // }
       let isManager = false
       const exist = await userCollection.findOne({ email: email })
       if (exist) {
@@ -192,9 +208,6 @@ async function run() {
     })
     app.get('/users/admin/:email', async (req, res) => {
       const email = req.params?.email
-      // if(email !== req.decoded?.email){
-      //   return res.status(403).send({message:'Forbidden access'})
-      // }
       let isAdmin = false
       const exist = await userCollection.findOne({ email: email })
       if (exist) {
@@ -203,13 +216,23 @@ async function run() {
       res.send(isAdmin)
     })
 
+    app.get('/users/banned/:email', async (req, res) => {
+      const email = req.params?.email
+      let isBanned = false
+      const exist = await userCollection.findOne({ email: email })
+      if (exist) {
+        isBanned = exist.restriction === 'banned'
+      }
+      res.send(isBanned)
+    })
+
     app.get('/products/:email', verifyingToken, verifyingManager, async (req, res) => {
       const email = req.params.email
       const result = await productCollection.find({ manager: email }).toArray()
       res.send(result)
     })
 
-    app.get('/products/update/:id', verifyingToken, verifyingManager, async (req, res) => {
+    app.get('/products/update/:id',  async (req, res) => {
       const id = req.params.id
       const result = await productCollection.findOne({ _id: new ObjectId(id) })
       res.send(result)
@@ -310,7 +333,6 @@ async function run() {
       const product = await productCollection.findOne({ _id: new ObjectId(id) })
       const newSaleCount = product?.saleCount + 1;
       const newQuantity = product?.productQuantity - 1;
-
       const updatedDoc = {
         $set: {
           saleCount: newSaleCount,
@@ -371,7 +393,7 @@ async function run() {
     app.post('/jwt', (req, res) => {
       const user = req.body
       const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
-        expiresIn: '7h'
+        expiresIn: '1h'
       })
       res.send({ token })
     })
